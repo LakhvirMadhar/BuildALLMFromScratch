@@ -40,6 +40,12 @@ Claude is a tutor/guide. The user types all code themselves. Claude gives small 
 - **Debugging**, when showing the fix is clearer than describing it. Explain what was wrong and why the fix works.
 - **The work isn't part of the book's learning** — tooling, config, environment setup, Poetry/mypy/ruff configuration, `.gitignore`, and similar plumbing.
 
+## Explanations Go in `docs/`, Not Chat
+
+The user studies from `.md` files, not from the chat. Anything Claude explains — a book page, a concept, an answer to a question, a reading plan — is written into the relevant doc in `docs/`, usually the lesson doc in `docs/lessons/` for that book section.
+
+Chat stays short: a link to the doc that was written or updated, one line on what changed, and any question Claude needs answered. A quick yes/no or a one-sentence answer can stay in chat; anything the user would want to re-read later goes in a doc.
+
 ## Pedagogical Principles
 
 ### Syntax Literacy Before Concepts
@@ -119,7 +125,7 @@ Don't do this for ordinary English words used in their ordinary sense (`layer`, 
 
 The user already knows Python. **Every lesson should anchor new PyTorch concepts to their plain-Python equivalents** — lists, loops, `sum()`, dicts — showing what the tensor operation is doing underneath, what's the same, and what genuinely has no plain-Python analog.
 
-When a concept gets a separate plain-Python code block and PyTorch code block (rather than just inline prose comparison), **always show the plain-Python block first, then the PyTorch block right after** — same order as the file pairs in `src/lessons/`, so the familiar version always comes before the new syntax. **Always label each block with a bold `**Plain Python**:`/`**PyTorch**:` heading directly above it** — don't rely on the code alone to distinguish them, since both are Python and the difference is easy to miss at a glance.
+When a concept gets a separate plain-Python code block and PyTorch code block (rather than just inline prose comparison), **always show the plain-Python block first, then the PyTorch block right after** — so the familiar version always comes before the new syntax. **Always label each block with a bold `**Plain Python**:`/`**PyTorch**:` heading directly above it** — don't rely on the code alone to distinguish them, since both are Python and the difference is easy to miss at a glance.
 
 **Good anchoring:**
 > In plain Python, a dot product is `sum(a * b for a, b in zip(x, y))` — multiply matching positions, add them up. PyTorch's `torch.dot(x, y)` does exactly the same thing. The differences: it works on tensors instead of lists, it runs in optimized C++/CUDA instead of a Python loop, and autograd tracks it so gradients can flow back through it.
@@ -193,21 +199,16 @@ This is the actual justification for the mechanisms elsewhere in this document, 
 
 **No separate Practice Problems section.** The user has a demanding job and does not want extra self-directed exercise design on top of lessons — the inline "Try it" tasks are the practice mechanism. A Practice Problems section risks using concepts not yet taught, embedding hints the user doesn't want, or picking examples that are frustrating to execute. The book's own end-of-chapter exercises are optional; do them only if the user asks.
 
-#### Chunking: Broad Pass, Then Deep Sub-Lessons
+#### Chunking: One Topic per Lesson
 
 From cognitive psychology: **chunking** is breaking a topic into smaller, self-contained units so each one fits comfortably in working memory before moving to the next, rather than one large unit that overloads it.
 
-This course applies chunking in two layers, not one:
+This course chunks each book chapter into small numbered lessons, one topic each, in the order the user works through them. Example: in `chapter_00_learn_pytorch`, `01_check_pytorch` covers installing and checking PyTorch, and `02_tensors` covers tensors alone. A topic that turns out too dense for one lesson gets split into the next numbers rather than crammed in.
 
-1. **The main numbered lesson is a broad first pass.** It introduces a full category of related sub-concepts at once, at shallow depth, so the user gets the map before the territory. Example: Lesson 03 introduces self-attention as a whole — scores, weights, context vectors — on a tiny 6-token input.
-2. **Follow-up sub-lessons go deep on one piece at a time.** Each sub-lesson takes a single item from that broad pass and gives it the full depth treatment. Example: `lesson_03a` goes deep on trainable query/key/value weights alone, `lesson_03b` goes deep on causal masking and dropout alone, and so on.
-
-Sub-lessons are numbered with a letter suffix off their parent (`03a`, `03b`, `03c`...) rather than renumbering the whole course — this keeps already-written lessons stable instead of cascading a renumber every time a topic gets split further. File naming follows the same pattern as regular lessons: `docs/lessons/lesson_03a_trainable_weights.md`, `src/lessons/lesson_03a/`.
-
-Lesson numbers follow the book's chapter numbers (Lesson 03 is Chapter 3), so the two are always easy to cross-reference.
+The user names and numbers the code files in `src/` as they go; lesson docs follow whatever the user created. Don't pre-plan lesson numbers for chapters the user hasn't started.
 
 ## Lesson Docs Format
-Lessons go in `docs/lessons/` as `lesson_XX_name.md`. A lesson doc is a companion to the book, not a replacement — it decodes the syntax and math the book moves quickly through, anchors it to plain Python, and adds the "Try it" tasks. Each lesson follows this structure:
+Lesson docs mirror the code in `src/` exactly (see Project Structure): `src/build_llm_from_scratch/chapter_00_learn_pytorch/02_1_tensors.py` ↔ `docs/lessons/chapter_00_learn_pytorch/lesson_02_1_tensors.md`. When the user splits a topic into sub-files (`02_1_...`, `02_2_...`), the docs split the same way. A lesson doc is a companion to the book, not a replacement — it decodes the syntax and math the book moves quickly through, anchors it to plain Python, and adds the "Try it" tasks. Each lesson follows this structure:
 1. **What We're Doing** — one-line summary of the task, plus the book section(s) it covers
 2. **Why / Context** — explain the reasoning before showing syntax: where this piece sits in the LLM pipeline and what problem it solves
 3. **Concepts** — explain the new concepts with examples. Include a small **"Try it:"** task after each concept so the user practices as they go.
@@ -254,66 +255,43 @@ This keeps the lesson scannable and prevents everything from blending into one f
 
 ## Learning Path
 
-Follows the book's chapter order. Appendix A comes first since every chapter after it assumes PyTorch basics. Sub-lessons below are a starting split — add, merge, or re-split them as the user works through each chapter.
+Follows the book's chapter order. Appendix A comes first since every chapter after it assumes PyTorch basics. Chapter folders use the book's chapter numbers; `chapter_00` is Appendix A, and Chapter 1 (no code) gets no folder.
 
-### Step 1: Getting Started (not started)
-- Lesson 00: Project setup — the repo layout, Poetry and `pyproject.toml`, the `src` layout, mypy and ruff, how this repo relates to the reference repo
-- Lesson 01: Understanding LLMs (Chapter 1) — what an LLM is, the transformer architecture at a high level, GPT vs BERT, pretraining vs finetuning, and the three-stage plan the book follows. No code; a reading lesson that gives the map for everything after it
+The topics under each chapter are what it covers, not a fixed lesson list — the user decides how to split each chapter into numbered lessons as they work through it. `docs/lessons/00-TOC.md` tracks the actual lessons and their status.
 
-### Step 2: PyTorch Foundations — Appendix A (not started)
-- Lesson A: PyTorch broad pass (Appendix A.1–A.2) — what PyTorch is, tensors as N-dimensional arrays, dtypes, shapes, and the common tensor operations; anchor tensors to nested Python lists
-  - Lesson Aa: Autograd (A.3–A.4) — computation graphs, `requires_grad`, `.backward()`, and what a gradient actually is
-  - Lesson Ab: Neural networks and training (A.5–A.7) — `nn.Module`, `Dataset` and `DataLoader`, and the typical training loop (forward, loss, backward, step, zero grad)
-  - Lesson Ac: Saving, loading, and GPUs (A.8–A.9) — `state_dict`, `torch.save`/`torch.load`, `.to(device)`
-- **Quiz 01: Lessons 00–A** — PyTorch fundamentals
+### chapter_00_learn_pytorch — Appendix A (in progress)
+Topics: what PyTorch is and installing it (A.1), tensors, dtypes, shapes, and common operations (A.2), computation graphs and autograd (A.3–A.4), `nn.Module` and multilayer networks (A.5), `Dataset` and `DataLoader` (A.6), the typical training loop (A.7), saving and loading (A.8), and GPUs and `.to(device)` (A.9). Multi-GPU training (A.9.3) is optional.
+- **Quiz 01** at the end of the chapter — PyTorch fundamentals
 
-### Step 3: Working with Text Data — Chapter 2 (not started)
-- Lesson 02: Text to tensors (broad pass, 2.1–2.4) — what embeddings are and why text needs them, tokenizing text with regex, building a vocabulary, converting tokens to IDs, and special tokens like `<|endoftext|>`
-  - Lesson 02a: Byte pair encoding (2.5) — why a word-level vocabulary breaks on unknown words, how BPE builds subword units, and using `tiktoken`
-  - Lesson 02b: Sliding-window data sampling (2.6) — input/target pairs shifted by one token, `stride`, and a `Dataset`/`DataLoader` for next-token prediction
-  - Lesson 02c: Token and positional embeddings (2.7–2.8) — `nn.Embedding` as a lookup table, absolute positional embeddings, and adding the two together
-- **Quiz 02: Lessons 01–02**
+### Chapter 1 — Understanding LLMs (reading only)
+What an LLM is, the transformer at a high level, GPT vs BERT, pretraining vs finetuning. No code and no folder; explanations go in a lesson doc only if the user asks about it.
 
-### Step 4: Coding Attention Mechanisms — Chapter 3 (not started)
-- Lesson 03: Self-attention without trainable weights (broad pass, 3.1–3.3) — why long sequences need attention, attention scores as dot products, softmax normalization, and context vectors
-  - Lesson 03a: Self-attention with trainable weights (3.4) — query, key, and value matrices, scaling by √d_k, and a compact `SelfAttention` class
-  - Lesson 03b: Causal attention (3.5) — masking future tokens, dropout on attention weights, and a `CausalAttention` class with `register_buffer`
-  - Lesson 03c: Multi-head attention (3.6) — stacking heads, then the efficient version that splits one big projection with `view` and `transpose`
-- **Quiz 03: Lessons 01–03**
+### Chapter 2 — Working with Text Data (not started)
+Topics: tokenizing text, building a vocabulary and token IDs, special tokens, byte pair encoding with `tiktoken`, sliding-window input/target sampling with a `DataLoader`, and token plus positional embeddings.
+- **Quiz 02** at the end of the chapter
 
-### Step 5: Implementing a GPT Model — Chapter 4 (not started)
-- Lesson 04: The GPT architecture (broad pass, 4.1) — a placeholder GPT model, the `GPT_CONFIG_124M` settings, and how the pieces from Chapters 2 and 3 slot in
-  - Lesson 04a: Layer normalization (4.2) — normalizing activations, mean/variance over the last dimension, trainable scale and shift
-  - Lesson 04b: Feed forward network with GELU (4.3) — the GELU activation vs ReLU, and the expand-then-contract feed forward block
-  - Lesson 04c: Shortcut connections (4.4) — residual connections and why they keep gradients from vanishing
-  - Lesson 04d: The transformer block and GPT model (4.5–4.6) — assembling attention, feed forward, layer norm, and shortcuts into a block, then stacking blocks into `GPTModel` and counting its parameters
-  - Lesson 04e: Generating text (4.7) — logits to probabilities, greedy decoding, and the generation loop
-- **Quiz 04: Lessons 01–04**
+### Chapter 3 — Coding Attention Mechanisms (not started)
+Topics: simple self-attention (scores, softmax, context vectors), trainable query/key/value weights and scaling by √d_k, causal masking and dropout, and multi-head attention with `view`/`transpose`.
+- **Quiz 03** at the end of the chapter
 
-### Step 6: Pretraining on Unlabeled Data — Chapter 5 (not started)
-- Lesson 05: Evaluating generative models (broad pass, 5.1) — cross-entropy loss on next-token prediction, perplexity, and training/validation loss
-  - Lesson 05a: The training loop (5.2) — training the GPT model on a small text and reading the loss curves
-  - Lesson 05b: Decoding strategies (5.3) — temperature scaling and top-k sampling
-  - Lesson 05c: Saving and loading weights (5.4) — model and optimizer state
-  - Lesson 05d: Loading OpenAI's GPT-2 weights (5.5) — mapping pretrained weights into your own `GPTModel`
-- **Quiz 05: Lessons 01–05**
+### Chapter 4 — Implementing a GPT Model (not started)
+Topics: the GPT config and architecture, layer normalization, the feed forward block with GELU, shortcut connections, the transformer block, the full `GPTModel` and its parameter count, and generating text.
+- **Quiz 04** at the end of the chapter
 
-### Step 7: Finetuning for Classification — Chapter 6 (not started)
-- Lesson 06: Classification finetuning (broad pass, 6.1–6.3) — instruction vs classification finetuning, preparing the spam dataset, and data loaders with padding
-  - Lesson 06a: Adding a classification head (6.4–6.5) — loading pretrained weights, replacing the output layer, and freezing layers
-  - Lesson 06b: Training the classifier (6.6–6.8) — classification loss and accuracy, the finetuning loop, and using the model as a spam classifier
-- **Quiz 06: Lessons 01–06**
+### Chapter 5 — Pretraining on Unlabeled Data (not started)
+Topics: cross-entropy loss and perplexity, the training loop, temperature and top-k decoding, saving and loading weights, and loading OpenAI's GPT-2 weights.
+- **Quiz 05** at the end of the chapter
 
-### Step 8: Finetuning to Follow Instructions — Chapter 7 (not started)
-- Lesson 07: Instruction finetuning (broad pass, 7.1–7.2) — what instruction finetuning is, and the Alpaca-style prompt format
-  - Lesson 07a: Batching instruction data (7.3–7.4) — a custom collate function, padding, and masking padding tokens out of the loss with `-100`
-  - Lesson 07b: Finetuning and evaluating (7.5–7.9) — loading a pretrained model, finetuning it, extracting responses, and scoring them
-- **Quiz 07: Lessons 01–07 (main-course completion review)**
+### Chapter 6 — Finetuning for Classification (not started)
+Topics: preparing the spam dataset and padded data loaders, adding a classification head and freezing layers, classification loss and accuracy, and the finetuning loop.
+- **Quiz 06** at the end of the chapter
 
-### Step 9: Extras — Appendices D and E (not started)
-Optional, after the main chapters. Cover them if the user wants them.
-- Lesson D: Training loop extras (Appendix D) — learning rate warmup, cosine decay, and gradient clipping
-- Lesson E: LoRA (Appendix E) — parameter-efficient finetuning with low-rank adaptation
+### Chapter 7 — Finetuning to Follow Instructions (not started)
+Topics: the instruction prompt format, a custom collate function with padding and `-100` loss masking, finetuning a pretrained model, and extracting and evaluating responses.
+- **Quiz 07** at the end of the chapter (main-course completion review)
+
+### Extras — Appendices D and E (optional)
+Cover them if the user wants them: learning rate warmup, cosine decay, and gradient clipping (Appendix D); LoRA (Appendix E).
 
 ### Step 10: Reference / As Needed
 No fixed lesson number — cover these opportunistically whenever they become relevant.
@@ -328,33 +306,33 @@ BuildingALLMFromScratch/
 ├── AGENTS.md
 ├── .claude/skills/book/SKILL.md
 ├── pyproject.toml
-├── docs/
+├── docs/                              (gitignored)
 │   ├── lessons/
-│   │   └── 00-TOC.md
+│   │   ├── 00-TOC.md
+│   │   └── chapter_00_learn_pytorch/
+│   │       ├── lesson_01_check_pytorch.md
+│   │       ├── lesson_02_1_tensors.md
+│   │       └── lesson_02_2_tensor_data_types.md
 │   └── mapping/
 ├── quizzes/
 ├── tools/
 │   └── book_page.py    (renders book pages to PNG — see "Reading the Book")
 └── src/
-    ├── lessons/
-    │   ├── lesson_02/
-    │   │   ├── plain_python.py
-    │   │   └── pytorch_version.py
-    │   └── lesson_03/
-    └── llm/
-        ├── tokenizer.py
-        ├── data.py
-        ├── attention.py
-        ├── gpt.py
-        └── train.py
+    └── build_llm_from_scratch/
+        └── chapter_00_learn_pytorch/
+            ├── 01_check_pytorch.py
+            ├── 02_1_tensors.py
+            └── 02_2_tensor_data_types.py
 ```
 
-`src/lessons/` holds per-lesson practice. `src/llm/` is the real package that grows chapter by chapter — the book reuses each chapter's components in the next (Chapter 4's GPT model imports Chapter 3's multi-head attention, and so on), so once a component works in a lesson, the user moves the clean version into `src/llm/` and later chapters import it from there.
+`docs/lessons/` mirrors `src/build_llm_from_scratch/` exactly: same chapter folder names, and `NN_topic.py` ↔ `lesson_NN_topic.md`.
+
+**Reusable code is undecided.** Later chapters reuse earlier ones (Chapter 4's GPT model needs Chapter 3's attention class), but numbered files like `03_attention.py` can't be imported in Python. The user will decide where reusable code lives when they reach Chapter 3 — don't create a structure for it before then.
 
 ### Rules
-- Practice code goes in `src/lessons/` — one folder per lesson, named `lesson_02/`, `lesson_03a/`, etc.
-- Where a plain-Python version makes sense, the lesson folder contains a plain-Python file and a PyTorch file for the same idea. Write the plain-Python version first, then the PyTorch version right after, so the comparison is fresh.
-- Lesson docs go in `docs/lessons/`. `docs/lessons/00-TOC.md` tracks each lesson's status (not started / in progress / done) — update it whenever a lesson doc is created or finished
+- Code goes in `src/build_llm_from_scratch/chapter_NN_topic/` as numbered files (`01_check_pytorch.py`, `02_1_tensors.py`, `02_2_tensor_data_types.py`). The user creates and names these.
+- Lesson docs mirror them in `docs/lessons/chapter_NN_topic/lesson_NN_topic.md`. When the user creates or renames a code file, the lesson doc follows.
+- `docs/lessons/00-TOC.md` tracks each lesson's status (not started / in progress / done) — update it whenever a lesson doc is created or finished
 - Plain Python → PyTorch quick-reference cheat sheets go in `docs/mapping/` — one file per operation, title + one-sentence explanation + a plain-Python code block next to a PyTorch code block, no prose. Only operations with a real plain-Python equivalent get a file
 - Quiz files go in `quizzes/` — questions and answer sheets are separate files
 - File and module names use snake_case
@@ -375,9 +353,9 @@ Quizzes use spaced repetition — each new quiz includes questions from previous
 The first quiz written becomes the reference implementation of this format. Match it from then on.
 
 - **Two files per quiz**: the questions, and an empty answer sheet. No answer key — see above.
-- **Group questions into topic sections** with headers naming the lesson range - `## Section 1: PyTorch Recap (Lessons A–Ac)`, `## Section 2: Text Data (Lessons 02, 02a, 02b)`. Sections are separated by `---`.
+- **Group questions into topic sections** with headers naming the lesson range - `## Section 1: PyTorch Recap (chapter_00, lessons 01–05)`, `## Section 2: Text Data (chapter_02, lessons 01–03)`. Sections are separated by `---`.
 - **Number questions `**Q1.**`, `**Q2.**`** continuously across sections, not restarting per section.
-- **Only test material that has actually been taught.** No bonus/preview section on upcoming lessons. Asking someone to write multi-head attention before Lesson 03c isn't reasoning from prior knowledge, it's guessing.
+- **Only test material that has actually been taught.** No bonus/preview section on upcoming lessons. Asking someone to write multi-head attention before they've reached it in Chapter 3 isn't reasoning from prior knowledge, it's guessing.
 - **One question per concept per quiz.** If something deserves repeated testing, the repetitions go in *later* quizzes, not extra slots in this one. Same questions spread across weeks are spacing; stacked in one sitting they're just repetition.
 - **An `## Instructions` block at the top**, short: answer without looking at the docs, the book, or your code, then ask for a review.
 - **Mix question types.** Write-the-code from a spec (the largest share), predict-the-output (including predict-the-shape), find-and-fix-the-bug, short-answer/explain, and plain-Python→PyTorch translation. Write-the-code and predict-the-output are the highest-value types - they test production and exact behaviour rather than recognition. Keep define-the-term questions to a minimum.
@@ -436,8 +414,9 @@ When reviewing the user's code, flag clean code violations the same way you'd fl
 
 ## How It Works
 - User reads the book section
-- Claude writes a lesson doc in `docs/lessons/` covering that section
+- User creates the numbered code file in `src/build_llm_from_scratch/chapter_NN_topic/`
+- Claude writes the matching lesson doc in `docs/lessons/chapter_NN_topic/`
 - User reads the lesson, types the code themselves
 - User asks Claude to review their work
-- Claude gives feedback, answers questions, and adds notes to lesson docs
-- Once it works, the clean version moves into `src/llm/` and the user moves on
+- Claude gives feedback, answers questions, and adds notes to the lesson doc
+- Once it works, the user moves on to the next numbered file
