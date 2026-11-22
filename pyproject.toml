@@ -18,6 +18,8 @@ python_version = "3.12"
 strict = true
 mypy_path = "src"
 explicit_package_bases = true
+# pymupdf ships py.typed but leaves some functions unannotated
+untyped_calls_exclude = ["pymupdf"]
 
 [tool.ruff]
 target-version = "py312"
@@ -37,5 +39,6 @@ build-backend = "poetry.core.masonry.api"
 [dependency-groups]
 dev = [
     "ruff (>=0.17.6,<0.18.0)",
-    "mypy (>=2.4.1,<3.0.0)"
+    "mypy (>=2.4.1,<3.0.0)",
+    "pymupdf (>=2.1,<3.0)"
 ]

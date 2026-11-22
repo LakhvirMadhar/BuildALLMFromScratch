@@ -14,6 +14,16 @@ This workspace has two folders:
 - `BuildingALLMFromScratch/` - the user's repo. All of the user's code goes here.
 - `LLMs-from-scratch-main/` - the book's official repo, by Sebastian Raschka. **Reference only.** Use it to check the user's work against, or to get unstuck when the user asks. Never copy code from it into the user's repo, and never show the reference solution unprompted.
 
+## Reading the Book
+
+The book PDF is at `../LLMs-from-scratch-main/Build_a_Large_Language_Model_(From_Scrat.pdf`. Every page is pre-rendered as a PNG at `.cache/book_pages/page_<N>.png` (gitignored), so figures, code listings, and math stay intact.
+
+When the user asks about a page ("look at page 253", `/book 88-90`), use the `book` skill in `.claude/skills/book/`. It opens the page images and explains them.
+
+Page numbers are the ones **printed in the book**, not the PDF viewer's page index (book page 253 is PDF page 275). Roman-numeral front-matter pages use their numeral (`page_xii.png`).
+
+If `.cache/` is ever deleted, regenerate it with `poetry run python tools/book_page.py all` (about 10 seconds). Don't use the Read tool on the PDF directly: on Windows it fails with "pdftoppm is not installed".
+
 ## Stack
 
 - **Python 3.12**, managed with **Poetry**
@@ -316,12 +326,15 @@ No fixed lesson number — cover these opportunistically whenever they become re
 ```
 BuildingALLMFromScratch/
 ├── AGENTS.md
+├── .claude/skills/book/SKILL.md
 ├── pyproject.toml
 ├── docs/
 │   ├── lessons/
 │   │   └── 00-TOC.md
 │   └── mapping/
 ├── quizzes/
+├── tools/
+│   └── book_page.py    (renders book pages to PNG — see "Reading the Book")
 └── src/
     ├── lessons/
     │   ├── lesson_02/

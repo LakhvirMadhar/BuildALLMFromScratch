@@ -1,3 +1,6 @@
 
 # Personal VS Code workspace file
 *.code-workspace
+
+# Rendered book pages (tools/book_page.py)
+.cache/
