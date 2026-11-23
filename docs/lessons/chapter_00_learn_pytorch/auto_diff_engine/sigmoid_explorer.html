@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sigmoid Explorer</title>
+<style>
+  /* Layout: one column - controls, the S-curve plot, then the formula traced with live numbers */
+  :root {
+    --bg: #f6f7fb;
+    --panel: #ffffff;
+    --fg: #1c2030;
+    --muted: #626a82;
+    --grid: #e2e5ef;
+    --curve: #3557d6;
+    --step: #d08a2c;
+    --tangent: #1f9d74;
+    --point: #d6355e;
+    --font-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12141c;
+      --panel: #1b1e2a;
+      --fg: #e6e8f0;
+      --muted: #9aa1b8;
+      --grid: #2c3042;
+      --curve: #7d96ff;
+      --step: #e8a94f;
+      --tangent: #4fd1a5;
+      --point: #ff6b8e;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 15px/1.55 var(--font-body);
+  }
+  main {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 24px 16px 48px;
+    display: grid;
+    gap: 18px;
+  }
+  h1 { margin: 0; font-size: 1.6rem; }
+  h2 { margin: 0 0 8px; font-size: 1.05rem; }
+  p { margin: 0; color: var(--muted); max-width: 65ch; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--grid);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .controls { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+  .control label { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 0.9rem; }
+  .control input[type="range"] { width: 100%; accent-color: var(--curve); }
+  .toggles { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 12px; font-size: 0.9rem; }
+  .toggles label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  canvas { width: 100%; height: 340px; display: block; }
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 0.85rem; color: var(--muted); margin-top: 8px; }
+  .swatch { display: inline-block; width: 14px; height: 3px; vertical-align: middle; margin-right: 6px; }
+  .trace { font-family: var(--font-mono); font-size: 0.95rem; display: grid; gap: 6px; overflow-x: auto; }
+  .trace .row { display: grid; grid-template-columns: 11rem 1fr; gap: 12px; white-space: nowrap; }
+  .trace .label { color: var(--muted); }
+  .trace strong { color: var(--point); font-variant-numeric: tabular-nums; }
+  .note { margin-top: 10px; }
+  button {
+    font: inherit; font-size: 0.85rem; padding: 4px 10px; border-radius: 6px;
+    border: 1px solid var(--grid); background: var(--bg); color: var(--fg); cursor: pointer;
+  }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--curve); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Sigmoid Explorer</h1>
+    <p>Drag the sliders to change the inputs of <code>z = x1 * w1 + b</code>, then watch where <code>z</code> lands on the S-curve and what loss it produces. Starts at the values in <code>01_logistic_regression_forward_pass.py</code>.</p>
+  </header>
+
+  <section class="panel">
+    <div class="controls">
+      <div class="control">
+        <label for="x1">x1 (feature) <span id="x1-val"></span></label>
+        <input id="x1" type="range" min="-4" max="4" step="0.1" value="1.1">
+      </div>
+      <div class="control">
+        <label for="w1">w1 (weight) <span id="w1-val"></span></label>
+        <input id="w1" type="range" min="-4" max="4" step="0.1" value="2.2">
+      </div>
+      <div class="control">
+        <label for="b">b (bias) <span id="b-val"></span></label>
+        <input id="b" type="range" min="-4" max="4" step="0.1" value="0">
+      </div>
+    </div>
+    <div class="toggles">
+      <label><input id="show-step" type="checkbox"> Show hard cutoff (step function)</label>
+      <label><input id="show-tangent" type="checkbox" checked> Show slope at z</label>
+      <label><input id="label-one" type="checkbox" checked> True label y = 1 (untick for y = 0)</label>
+      <button id="reset" type="button">Reset to file values</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <canvas id="plot" aria-label="Plot of the sigmoid curve with the current z marked"></canvas>
+    <div class="legend">
+      <span><span class="swatch" style="background: var(--curve)"></span>sigmoid(z)</span>
+      <span><span class="swatch" style="background: var(--point)"></span>current z</span>
+      <span><span class="swatch" style="background: var(--tangent)"></span>slope (how much a nudge to z moves the output)</span>
+      <span><span class="swatch" style="background: var(--step)"></span>step function</span>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>The formula, with your numbers</h2>
+    <div class="trace">
+      <div class="row"><span class="label">z = x1 * w1 + b</span><span id="t-z"></span></div>
+      <div class="row"><span class="label">e^(-z)</span><span id="t-exp"></span></div>
+      <div class="row"><span class="label">1 + e^(-z)</span><span id="t-den"></span></div>
+      <div class="row"><span class="label">a = 1 / (1 + e^(-z))</span><span id="t-a"></span></div>
+      <div class="row"><span class="label">slope = a * (1 - a)</span><span id="t-slope"></span></div>
+      <div class="row"><span class="label" id="t-loss-label"></span><span id="t-loss"></span></div>
+    </div>
+    <p class="note" id="note"></p>
+  </section>
+</main>
+
+<script>
+  const Z_RANGE = 8;
+  const FILE_VALUES = { x1: 1.1, w1: 2.2, b: 0 };
+  const PLOT_PADDING = { left: 44, right: 16, top: 16, bottom: 32 };
+
+  const sliders = {
+    x1: document.getElementById("x1"),
+    w1: document.getElementById("w1"),
+    b: document.getElementById("b"),
+  };
+  const showStep = document.getElementById("show-step");
+  const showTangent = document.getElementById("show-tangent");
+  const labelOne = document.getElementById("label-one");
+  const canvas = document.getElementById("plot");
+  const ctx = canvas.getContext("2d");
+
+  const sigmoid = (z) => 1 / (1 + Math.exp(-z));
+  const fmt = (n, digits = 4) => (Math.abs(n) >= 1e4 ? n.toExponential(2) : n.toFixed(digits));
+  const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+  function readInputs() {
+    const x1 = Number(sliders.x1.value);
+    const w1 = Number(sliders.w1.value);
+    const b = Number(sliders.b.value);
+    return { x1, w1, b, z: x1 * w1 + b, y: labelOne.checked ? 1 : 0 };
+  }
+
+  function binaryCrossEntropy(a, y) {
+    const clamped = Math.min(Math.max(a, 1e-12), 1 - 1e-12);
+    return -(y * Math.log(clamped) + (1 - y) * Math.log(1 - clamped));
+  }
+
+  function sizeCanvas() {
+    const ratio = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = Math.round(rect.width * ratio);
+    canvas.height = Math.round(rect.height * ratio);
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    return { width: rect.width, height: rect.height };
+  }
+
+  function drawPlot({ z }) {
+    const { width, height } = sizeCanvas();
+    const plotW = width - PLOT_PADDING.left - PLOT_PADDING.right;
+    const plotH = height - PLOT_PADDING.top - PLOT_PADDING.bottom;
+    const toX = (zValue) => PLOT_PADDING.left + ((zValue + Z_RANGE) / (2 * Z_RANGE)) * plotW;
+    const toY = (output) => PLOT_PADDING.top + (1 - output) * plotH;
+
+    ctx.clearRect(0, 0, width, height);
+    ctx.font = "12px " + cssVar("--font-mono");
+    ctx.lineWidth = 1;
+
+    // grid and axis labels
+    ctx.strokeStyle = cssVar("--grid");
+    ctx.fillStyle = cssVar("--muted");
+    for (const output of [0, 0.25, 0.5, 0.75, 1]) {
+      ctx.beginPath(); ctx.moveTo(toX(-Z_RANGE), toY(output)); ctx.lineTo(toX(Z_RANGE), toY(output)); ctx.stroke();
+      ctx.textAlign = "right"; ctx.fillText(output.toFixed(2), PLOT_PADDING.left - 6, toY(output) + 4);
+    }
+    for (let zTick = -Z_RANGE; zTick <= Z_RANGE; zTick += 2) {
+      ctx.beginPath(); ctx.moveTo(toX(zTick), toY(0)); ctx.lineTo(toX(zTick), toY(1)); ctx.stroke();
+      ctx.textAlign = "center"; ctx.fillText(String(zTick), toX(zTick), height - 10);
+    }
+
+    if (showStep.checked) {
+      ctx.strokeStyle = cssVar("--step");
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      ctx.moveTo(toX(-Z_RANGE), toY(0)); ctx.lineTo(toX(0), toY(0));
+      ctx.lineTo(toX(0), toY(1)); ctx.lineTo(toX(Z_RANGE), toY(1));
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    ctx.strokeStyle = cssVar("--curve");
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    for (let i = 0; i <= 400; i++) {
+      const zValue = -Z_RANGE + (i / 400) * 2 * Z_RANGE;
+      const px = toX(zValue), py = toY(sigmoid(zValue));
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+
+    const shownZ = Math.min(Math.max(z, -Z_RANGE), Z_RANGE);
+    const a = sigmoid(shownZ);
+
+    if (showTangent.checked) {
+      const slope = a * (1 - a);
+      const halfSpan = 1.5;
+      ctx.strokeStyle = cssVar("--tangent");
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(toX(shownZ - halfSpan), toY(a - slope * halfSpan));
+      ctx.lineTo(toX(shownZ + halfSpan), toY(a + slope * halfSpan));
+      ctx.stroke();
+    }
+
+    ctx.strokeStyle = cssVar("--point");
+    ctx.setLineDash([3, 3]);
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(toX(shownZ), toY(0)); ctx.lineTo(toX(shownZ), toY(a)); ctx.lineTo(toX(-Z_RANGE), toY(a)); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = cssVar("--point");
+    ctx.beginPath(); ctx.arc(toX(shownZ), toY(a), 6, 0, 2 * Math.PI); ctx.fill();
+  }
+
+  function describe(z, a) {
+    if (Math.abs(z) < 0.5) return "z is near 0, so the model sits on the fence near 0.5. This is the steep part of the curve: small nudges to z move the output a lot.";
+    if (Math.abs(z) > 5) return "z is far from 0, so the curve is almost flat here. The output barely changes when z moves, so the slope (the learning signal) is close to 0.";
+    return z > 0
+      ? `z is positive, so the output is above 0.5: the model leans toward class 1 (${(a * 100).toFixed(1)}% sure).`
+      : `z is negative, so the output is below 0.5: the model leans toward class 0 (${((1 - a) * 100).toFixed(1)}% sure).`;
+  }
+
+  function render() {
+    const inputs = readInputs();
+    const { x1, w1, b, z, y } = inputs;
+    const expTerm = Math.exp(-z);
+    const a = sigmoid(z);
+
+    document.getElementById("x1-val").textContent = x1.toFixed(1);
+    document.getElementById("w1-val").textContent = w1.toFixed(1);
+    document.getElementById("b-val").textContent = b.toFixed(1);
+
+    document.getElementById("t-z").innerHTML = `${x1.toFixed(1)} * ${w1.toFixed(1)} + ${b.toFixed(1)} = <strong>${fmt(z)}</strong>`;
+    document.getElementById("t-exp").innerHTML = `e^(${fmt(-z)}) = <strong>${fmt(expTerm)}</strong>`;
+    document.getElementById("t-den").innerHTML = `1 + ${fmt(expTerm)} = <strong>${fmt(1 + expTerm)}</strong>`;
+    document.getElementById("t-a").innerHTML = `1 / ${fmt(1 + expTerm)} = <strong>${fmt(a)}</strong>`;
+    document.getElementById("t-slope").innerHTML = `${fmt(a)} * ${fmt(1 - a)} = <strong>${fmt(a * (1 - a))}</strong>`;
+    document.getElementById("t-loss-label").textContent = y === 1 ? "loss = -log(a)" : "loss = -log(1 - a)";
+    document.getElementById("t-loss").innerHTML = `<strong>${fmt(binaryCrossEntropy(a, y))}</strong>`;
+    document.getElementById("note").textContent = describe(z, a);
+
+    drawPlot(inputs);
+  }
+
+  for (const input of [...Object.values(sliders), showStep, showTangent, labelOne]) {
+    input.addEventListener("input", render);
+  }
+  document.getElementById("reset").addEventListener("click", () => {
+    for (const [name, value] of Object.entries(FILE_VALUES)) sliders[name].value = value;
+    labelOne.checked = true;
+    render();
+  });
+  window.addEventListener("resize", render);
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", render);
+  render();
+</script>
+</body>
+</html>

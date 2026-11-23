@@ -4,6 +4,3 @@
 
 # Rendered book pages (tools/book_page.py)
 .cache/
-
-# Lesson docs reference the book closely; keep them local for now
-docs/
