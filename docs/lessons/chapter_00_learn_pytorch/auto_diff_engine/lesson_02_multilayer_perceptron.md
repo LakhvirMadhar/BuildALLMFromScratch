@@ -220,7 +220,163 @@ NeuralNetwork(
 - `in_features` / `out_features` - the two arguments you passed to `Linear`.
 - `bias=True` - the layer has a bias (the default). `Linear(50, 30, bias=False)` would leave it out.
 
-**Try it:** Print `model.layers[0].weight.shape` and predict it first. Then count every learnable number with `sum(p.numel() for p in model.parameters())` and check it against this: `50 × 30 + 30 + 30 × 20 + 20 + 20 × 3 + 3 = 2,213`.
+**Try it:** Print `model.layers[0].weight.shape` and predict it first.
+
+### `y = mx + b` in ML notation
+
+From school algebra, `y = mx + b` is a straight line: `m` is the slope, `b` is where the line crosses the y-axis. One input `x`, one output `y`, two numbers that set the line's shape.
+
+ML uses the same formula with different letters and more inputs:
+
+```
+z = w1*x1 + w2*x2 + ... + wn*xn + b
+```
+
+- `m` becomes `w` - a **weight**. Same job as the slope: how much this input pushes the output up or down.
+- `b` stays `b` - the **bias**. Same job as the intercept: a starting offset added no matter what the inputs are.
+- `x` becomes `x1 ... xn` - one example has many input features, and each gets its own weight.
+- `y` is often called `z` - the raw output before any activation, as in lesson 01.
+
+Lesson 01's `z = x1 * w1 + b` was exactly `y = mx + b`, renamed: one input, one weight, one bias.
+
+A `Linear(in_features, out_features)` layer is `out_features` of these formulas side by side, one per node. Each node has its own `in_features` weights and its own bias. Written as matrices, that's `y = Wx + b`: `W` holds every node's weights, shape `(out_features, in_features)`, and `b` holds every node's bias, shape `(out_features,)`.
+
+#### Building up from one `m` to many, with numbers
+
+The jump from `y = mx + b` to `y = Wx + b` happens in two steps. Each step adds one thing.
+
+**Step 1 - one input, one output.** Plain `y = mx + b`.
+
+Predicting a house price `y` from its size `x`, with `m = 3` and `b = 10`:
+
+```
+x = 2
+y = 3*2 + 10 = 16
+```
+
+Parameters: `m` and `b`, so **2**. As a layer, this is `Linear(1, 1)`.
+
+**Step 2 - more inputs, still one output.** Now the house has two features: size `x1` and number of rooms `x2`. Each input gets its own `m`, but there's still one `b`, because there's still one output:
+
+```
+x1 = 2, x2 = 4
+w1 = 3, w2 = 0.5, b = 10
+
+y = w1*x1 + w2*x2 + b
+  = 3*2 + 0.5*4 + 10
+  = 6 + 2 + 10
+  = 18
+```
+
+Each input's contribution gets added up, then the bias is added once. That "multiply matching pairs, then add" is a **dot product**, `w · x`, which you met in A.2.
+
+Parameters: 2 weights + 1 bias = **3**. As a layer, this is `Linear(2, 1)`: one node.
+
+**Step 3 - more inputs, more outputs.** Now you want three outputs from the same two inputs. Say three different scores, like the 3 output nodes in Figure A.9.
+
+Each output is its own Step 2 formula. Each one has its own pair of weights and its own bias:
+
+```
+y1 = 3*x1   + 0.5*x2 + 10
+y2 = -1*x1  + 2*x2   + 0
+y3 = 0.2*x1 + 1*x2   + -4
+```
+
+Stack those weights into a grid, one row per output and one column per input, and you get a matrix:
+
+```
+         x1    x2
+W = [[  3,   0.5 ],   <- y1's weights
+     [ -1,   2   ],   <- y2's weights
+     [ 0.2,  1   ]]   <- y3's weights
+
+b = [10, 0, -4]       <- one bias per output
+```
+
+That grid is `W`, shape `(3, 2)`, which is `(out_features, in_features)`. `y = Wx + b` is shorthand for "run all three Step 2 formulas at once." Each row of `W` dotted with `x`, plus that row's bias.
+
+Parameters: 3 × 2 weights + 3 biases = **9**. As a layer, this is `Linear(2, 3)`, and `(in × out) + out = 2×3 + 3 = 9`.
+
+So the counting formula falls straight out of the grid: **one weight per cell (`in × out`), plus one bias per row (`out`).**
+
+**Plain Python** (Step 3 with lists):
+```python
+x = [2.0, 4.0]
+W = [[3.0, 0.5], [-1.0, 2.0], [0.2, 1.0]]
+b = [10.0, 0.0, -4.0]
+
+y = [sum(w * xi for w, xi in zip(row, x)) + bias for row, bias in zip(W, b)]
+# [18.0, 6.0, 0.4]
+```
+
+**PyTorch:**
+```python
+x = torch.tensor([2.0, 4.0])
+W = torch.tensor([[3.0, 0.5], [-1.0, 2.0], [0.2, 1.0]])
+b = torch.tensor([10.0, 0.0, -4.0])
+
+y = W @ x + b   # shape (3,)
+```
+
+`torch.nn.Linear(2, 3)` stores a `W` of shape `(3, 2)` and a `b` of shape `(3,)`, exactly like these. It just fills them with random starting values instead of the ones typed here, and training adjusts them.
+
+**Template:**
+```python
+y = W @ x + b   # W: (out_features, in_features), x: (in_features,), b: (out_features,)
+```
+
+**Try it:** Work out `y2` and `y3` from Step 3 by hand, using `x1 = 2, x2 = 4`. Check them against the plain-Python result. Then change Step 3 to **four** outputs by adding a row of your own, and predict the new shapes of `W`, `b`, and `y` before running the PyTorch version.
+
+### Counting parameters (Exercise A.3, page 267)
+
+A **parameter** is one learnable number: one weight or one bias. Training adjusts every one of them. Counting them tells you how big a model is. "GPT-2 has 124 million parameters" means exactly this count.
+
+Only `Linear` layers have parameters here. `ReLU` is a fixed rule (zero the negatives) with nothing to learn.
+
+Per `Linear(in_features, out_features)` layer:
+
+```
+params = (in_features × out_features) + out_features
+          weights                        biases
+```
+
+The total is that, summed over every `Linear` in the model.
+
+**Plain Python** (counting by hand from each layer's sizes):
+```python
+layer_sizes = [(50, 30), (30, 20), (20, 3)]   # (in_features, out_features) per Linear
+
+total = 0
+for in_features, out_features in layer_sizes:
+    total += in_features * out_features + out_features
+```
+
+**PyTorch** (asking the model to count its own tensors, from page 267):
+```python
+num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+```
+
+Decoding it piece by piece:
+
+- `model.parameters()` - yields every weight and bias tensor the model registered. For this network: 3 `Linear` layers × (1 weight + 1 bias) = 6 tensors.
+- `for p in ...` - `p` is one of those tensors, e.g. the first layer's weight, shape `(30, 50)`.
+- `p.numel()` - "**num**ber of **el**ements": how many numbers are in the tensor. For shape `(30, 50)`, that's `30 × 50 = 1500`. For a bias of shape `(30,)`, it's `30`.
+- `if p.requires_grad` - keep only tensors training will update. In this model that's all of them; it matters later when layers get **frozen** (Chapter 6) and should be left out of the "trainable" count.
+- `sum(... for ...)` - a generator expression, the same as the plain-Python loop above: add up every tensor's count.
+
+The plain-Python version reasons from the layer sizes; the PyTorch version counts the tensors those sizes created. They give the same number because `numel()` of a `(out, in)` weight is `in × out`, and `numel()` of a `(out,)` bias is `out`.
+
+**Template:**
+```python
+num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+```
+
+**Try it:** Exercise A.3 asks for the parameter count of the network in Listing A.9 (the one in your `01_data_loader.py`). By hand first:
+
+1. Write down each `Linear` layer's `in_features` and `out_features`, plugging in the sizes that listing passes.
+2. Write the expanded sum, one `(in × out) + out` term per layer.
+3. Do the arithmetic.
+4. Only then run the `num_params` line on that model and check your answer.
 
 ### Notes on your `02_multilayer_perceptron.py`
 
@@ -235,4 +391,5 @@ NeuralNetwork(
 - [ ] Check `Linear` weight and bias shapes against your predictions
 - [ ] Trace a batch of 4 examples through the network, shape by shape
 - [ ] Count the parameters and match 2,213
+- [ ] Exercise A.3: count Listing A.9's parameters by hand, then check with `num_params`
 - [ ] Next: page 267, the rest of A.5

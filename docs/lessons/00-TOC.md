@@ -21,6 +21,13 @@ Chapter folders use the book's chapter numbers. `chapter_00` is Appendix A (PyTo
 | [01 Logistic regression forward pass](chapter_00_learn_pytorch/auto_diff_engine/lesson_01_logistic_regression_forward_pass.md) | A.3 | in progress |
 | [02 Multilayer perceptron](chapter_00_learn_pytorch/auto_diff_engine/lesson_02_multilayer_perceptron.md) | A.5 | in progress |
 
+### data_loaders
+
+| Lesson | Book | Status |
+|---|---|---|
+| [01 Data loader and training loop](chapter_00_learn_pytorch/data_loaders/lesson_01_data_loader.md) | A.6–A.7 | in progress |
+| [The Training Loop](chapter_00_learn_pytorch/data_loaders/the_training_loop.md) | A.5–A.7 overview | reference |
+
 ## Upcoming chapters
 
 | Chapter | Book | Status |

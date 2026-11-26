@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neurons, Layers, and Linear</title>
+<style>
+  :root {
+    --bg: #fbfaf7; --fg: #1f2328; --muted: #6a6f76; --line: #c9ccd1;
+    --input: #4a7fd4; --hidden: #2f9e72; --output: #c4572a;
+    --hi: #e0a100; --panel: #ffffff; --border: #e3e5e8; --code-bg: #f3f4f6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181c; --fg: #e6e8eb; --muted: #9aa0a8; --line: #3a3f46;
+      --input: #6c9cf0; --hidden: #4cc49a; --output: #e7804f;
+      --hi: #f5c242; --panel: #1e2126; --border: #2c3036; --code-bg: #262a30;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1060px; margin: 0 auto; padding: 2rem 1.25rem 3rem; }
+  h1 { font-size: 1.6rem; margin: 0 0 .25rem; }
+  .lede { color: var(--muted); margin: 0 0 1.5rem; max-width: 62ch; }
+  .layout { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 1.25rem; }
+  @media (max-width: 820px) { .layout { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.1rem; }
+  svg { width: 100%; height: auto; display: block; }
+  .edge { stroke: var(--line); stroke-width: 1.5; transition: stroke .15s, stroke-width .15s, opacity .15s; }
+  .edge.on { stroke: var(--hi); stroke-width: 3.5; }
+  .dim .edge:not(.on) { opacity: .25; }
+  .node { cursor: pointer; transition: transform .15s; }
+  .node circle { stroke: var(--panel); stroke-width: 3; }
+  .node.on circle { stroke: var(--hi); stroke-width: 4; }
+  .node text { fill: #fff; font: 600 15px system-ui, sans-serif; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+  .col-label { fill: var(--fg); font: 700 14px system-ui, sans-serif; text-anchor: middle; }
+  .col-sub { fill: var(--muted); font: 13px ui-monospace, Consolas, monospace; text-anchor: middle; }
+  .bracket { fill: none; stroke: var(--muted); stroke-width: 1.2; }
+  .bracket-label { fill: var(--muted); font: 12px system-ui, sans-serif; text-anchor: middle; }
+  h2 { font-size: 1.05rem; margin: 0 0 .5rem; }
+  code, pre { font-family: ui-monospace, Consolas, monospace; font-size: .9rem; }
+  pre { background: var(--code-bg); border-radius: 8px; padding: .7rem .8rem; margin: .5rem 0; white-space: pre-wrap; }
+  .hint { color: var(--muted); font-size: .92rem; }
+  table.w { border-collapse: collapse; margin: .4rem 0 .2rem; font: .88rem ui-monospace, Consolas, monospace; }
+  table.w td, table.w th { border: 1px solid var(--border); padding: .25rem .5rem; text-align: center; }
+  table.w th { color: var(--muted); font-weight: 500; }
+  table.w tr.on td { background: color-mix(in srgb, var(--hi) 28%, transparent); }
+  .legend { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: .6rem; font-size: .9rem; color: var(--muted); }
+  .dot { display: inline-block; width: .75rem; height: .75rem; border-radius: 50%; margin-right: .35rem; vertical-align: -1px; }
+  .facts { margin-top: 1.25rem; }
+  .facts table { width: 100%; border-collapse: collapse; font-size: .95rem; }
+  .facts th, .facts td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .facts th { color: var(--muted); font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Neurons, layers, and <code>Linear</code></h1>
+  <p class="lede">Each circle is a <strong>neuron</strong>. Each column of circles is a <strong>layer</strong>. Each line is one <strong>weight</strong>.
+  This is a shrunken version of your network (2 → 3 → 2). Yours is 2 → 30 → 20 → 2, built the same way.
+  Hover or tap a neuron to see what it computes.</p>
+
+  <div class="layout">
+    <div class="card">
+      <svg id="net" viewBox="0 0 640 430" role="img" aria-label="Network diagram: 2 inputs, 3 hidden neurons, 2 outputs, fully connected"></svg>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--input)"></span>input values (your data)</span>
+        <span><span class="dot" style="background:var(--hidden)"></span>hidden neurons</span>
+        <span><span class="dot" style="background:var(--output)"></span>output neurons (logits)</span>
+      </div>
+    </div>
+
+    <div class="card" id="panel" aria-live="polite">
+      <h2 id="p-title">Pick a neuron</h2>
+      <div id="p-body">
+        <p class="hint">Hover a green or orange circle. Its incoming lines light up, and you'll see its formula and which row of the weight matrix it owns.</p>
+        <p class="hint">The blue circles on the left are just your two feature values. They don't compute anything.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card facts">
+    <h2>How the picture maps to your code</h2>
+    <table>
+      <tr><th>In the picture</th><th>In the code</th><th>Shape / count</th></tr>
+      <tr><td>Input column (blue)</td><td><code>features</code></td><td><code>(batch, 2)</code>, 2 numbers per example</td></tr>
+      <tr><td>Hidden column (green)</td><td><code>Linear(2, 3)</code> + <code>ReLU()</code></td><td>3 neurons</td></tr>
+      <tr><td>Lines into the hidden column</td><td><code>Linear(2, 3).weight</code></td><td><code>(3, 2)</code>: one row per neuron, one column per input. 6 weights</td></tr>
+      <tr><td>Output column (orange)</td><td><code>Linear(3, 2)</code></td><td>2 neurons, giving <code>logits</code> of shape <code>(batch, 2)</code></td></tr>
+      <tr><td>Lines into the output column</td><td><code>Linear(3, 2).weight</code></td><td><code>(2, 3)</code>: 6 weights</td></tr>
+      <tr><td>Your real network</td><td><code>Linear(2, 30)</code>, <code>Linear(30, 20)</code>, <code>Linear(20, 2)</code></td><td>columns of 30, 20, and 2 neurons</td></tr>
+    </table>
+    <p class="hint" style="margin-top:.75rem"><strong>Rule of thumb:</strong> <code>Linear(in, out)</code> is one layer of <code>out</code> neurons, each with <code>in</code> incoming lines.</p>
+  </div>
+</main>
+
+<script>
+const NS = "http://www.w3.org/2000/svg";
+const svg = document.getElementById("net");
+const X = { input: 110, hidden: 320, output: 530 };
+
+const nodes = [
+  { id: "x1", layer: "input", y: 165, label: "x1" },
+  { id: "x2", layer: "input", y: 285, label: "x2" },
+  { id: "h1", layer: "hidden", y: 115, label: "h1" },
+  { id: "h2", layer: "hidden", y: 225, label: "h2" },
+  { id: "h3", layer: "hidden", y: 335, label: "h3" },
+  { id: "o0", layer: "output", y: 165, label: "out0" },
+  { id: "o1", layer: "output", y: 285, label: "out1" },
+];
+const byId = Object.fromEntries(nodes.map(n => [n.id, n]));
+const color = { input: "var(--input)", hidden: "var(--hidden)", output: "var(--output)" };
+
+const edges = [];
+for (const h of ["h1", "h2", "h3"]) for (const x of ["x1", "x2"]) edges.push([x, h]);
+for (const o of ["o0", "o1"]) for (const h of ["h1", "h2", "h3"]) edges.push([h, o]);
+
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  (parent || svg).appendChild(e);
+  return e;
+}
+
+// Column headers
+const headers = [
+  ["input", "INPUT", "features"],
+  ["hidden", "HIDDEN LAYER", "Linear(2, 3) + ReLU"],
+  ["output", "OUTPUT LAYER", "Linear(3, 2)"],
+];
+for (const [layer, title, sub] of headers) {
+  el("text", { x: X[layer], y: 38, class: "col-label" }).textContent = title;
+  el("text", { x: X[layer], y: 58, class: "col-sub" }).textContent = sub;
+}
+
+// Weight-group brackets under the edges
+function bracket(x1, x2, label) {
+  el("path", { d: `M${x1} 392 v8 H${x2} v-8`, class: "bracket" });
+  el("text", { x: (x1 + x2) / 2, y: 420, class: "bracket-label" }).textContent = label;
+}
+bracket(X.input + 30, X.hidden - 30, "6 weights = weight shape (3, 2)");
+bracket(X.hidden + 30, X.output - 30, "6 weights = weight shape (2, 3)");
+
+const edgeG = el("g", {});
+const edgeEls = edges.map(([a, b]) => {
+  const e = el("line", { x1: X[byId[a].layer], y1: byId[a].y, x2: X[byId[b].layer], y2: byId[b].y, class: "edge" }, edgeG);
+  e.dataset.from = a; e.dataset.to = b;
+  return e;
+});
+
+const nodeEls = nodes.map(n => {
+  const g = el("g", { class: "node", tabindex: n.layer === "input" ? -1 : 0, role: "button", "aria-label": n.label });
+  el("circle", { cx: X[n.layer], cy: n.y, r: 28, fill: color[n.layer] }, g);
+  el("text", { x: X[n.layer], y: n.y }, g).textContent = n.label;
+  g.dataset.id = n.id;
+  return g;
+});
+
+const W1 = { rows: ["h1", "h2", "h3"], cols: ["x1", "x2"], name: "Linear(2, 3).weight", shape: "(3, 2)" };
+const W2 = { rows: ["o0", "o1"], cols: ["h1", "h2", "h3"], name: "Linear(3, 2).weight", shape: "(2, 3)" };
+const label = id => byId[id].label;
+
+function matrixHTML(W, activeRow) {
+  let h = `<table class="w"><tr><th></th>${W.cols.map(c => `<th>from ${label(c)}</th>`).join("")}</tr>`;
+  W.rows.forEach((r, i) => {
+    h += `<tr class="${r === activeRow ? "on" : ""}"><th>row ${i} (${label(r)})</th>${W.cols.map(() => "<td>w</td>").join("")}</tr>`;
+  });
+  return h + "</table>";
+}
+
+function show(id) {
+  const n = byId[id];
+  svg.classList.add("dim");
+  edgeEls.forEach(e => e.classList.toggle("on", e.dataset.to === id));
+  nodeEls.forEach(g => g.classList.toggle("on", g.dataset.id === id));
+  const W = n.layer === "hidden" ? W1 : W2;
+  const ins = W.cols.map(label);
+  const sum = ins.map((x, i) => `${x}·w${i + 1}`).join(" + ");
+  const formula = n.layer === "hidden"
+    ? `${n.label} = relu(${sum} + bias)`
+    : `${n.label} = ${sum} + bias      # no ReLU: raw score (logit)`;
+  document.getElementById("p-title").textContent = `Neuron ${n.label}`;
+  document.getElementById("p-body").innerHTML = `
+    <p>It takes <strong>every</strong> value from the previous column (${ins.join(", ")}), multiplies each by its own weight, adds them up, and adds a bias${n.layer === "hidden" ? ", then applies ReLU" : ""}.</p>
+    <pre>${formula}</pre>
+    <p>That's one perceptron: lesson 01's <code>z = x1 * w1 + b</code>, with ${ins.length} inputs instead of 1.</p>
+    <p>Its ${ins.length} incoming weights are <strong>one row</strong> of <code>${W.name}</code>, shape <code>${W.shape}</code>:</p>
+    ${matrixHTML(W, id)}
+    <p class="hint">${n.layer === "hidden"
+      ? "The 3 neurons in this column = the 3 rows. That's why the weight shape is (out_features, in_features)."
+      : "These 2 outputs are the logits: one score per class. cross_entropy compares them to the label."}</p>`;
+}
+
+function clear() {
+  svg.classList.remove("dim");
+  edgeEls.forEach(e => e.classList.remove("on"));
+  nodeEls.forEach(g => g.classList.remove("on"));
+}
+
+nodeEls.forEach(g => {
+  if (byId[g.dataset.id].layer === "input") return;
+  g.addEventListener("mouseenter", () => show(g.dataset.id));
+  g.addEventListener("focus", () => show(g.dataset.id));
+  g.addEventListener("click", () => show(g.dataset.id));
+});
+svg.addEventListener("mouseleave", clear);
+
+show("h1");
+</script>
+</body>
+</html>

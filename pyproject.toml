@@ -33,8 +33,24 @@ python_version = "3.12"
 strict = true
 mypy_path = "src"
 explicit_package_bases = true
-# pymupdf ships py.typed but leaves some functions unannotated
-untyped_calls_exclude = ["pymupdf"]
+# pymupdf ships py.typed but leaves some functions unannotated.
+# torch 2.4 ships py.typed, but scattered helpers (Tensor.backward,
+# torch.set_printoptions, ...) have no type hints. Allow calls into all of
+# torch rather than listing each module as it comes up; our own code stays strict.
+untyped_calls_exclude = ["pymupdf", "torch"]
+
+# torch 2.4's torch/optim/__init__.py imports optimizers like SGD without
+# listing them in __all__, so strict mode rejects the book's `torch.optim.SGD`
+[[tool.mypy.overrides]]
+module = ["torch.optim"]
+implicit_reexport = true
+
+[tool.pyright]
+# Point Pylance at the Poetry venv so imports like torch resolve in .py files and notebooks
+venvPath = "."
+venv = ".venv"
+# Same torch.optim re-export gap, as reported by Pylance in the editor
+reportPrivateImportUsage = false
 
 [tool.ruff]
 target-version = "py312"
@@ -55,5 +71,6 @@ build-backend = "poetry.core.masonry.api"
 dev = [
     "ruff (>=0.17.6,<0.18.0)",
     "mypy (>=2.4.1,<3.0.0)",
-    "pymupdf (>=2.1,<3.0)"
+    "pymupdf (>=2.1,<3.0)",
+    "ipykernel (>=7.4.0,<8.0.0)"
 ]
